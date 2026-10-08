@@ -1,12 +1,15 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import type { AppState } from "./state.ts";
+import type { SunnyConfig } from "./config.ts";
 import { getSunPosition } from "./solar.ts";
 import { isGlare } from "./geometry.ts";
 import type { DayArcPoint } from "./dayarc.ts";
 
 const SUN_DISTANCE = 16;
-const WINDOW_WIDTH = 3;
+const PLATFORM_SIZE = 14; // matches the floor/grid extent — the wall runs edge to edge of it
+const WALL_MIN_HEIGHT = 3.4;
+const WALL_TOP_MARGIN = 0.6; // headroom kept above the window top, whatever it's configured to
 
 /** Compass azimuth (deg, 0=N clockwise) -> horizontal unit vector, north=-Z, east=+X. */
 function azToHorizontal(azDeg: number): THREE.Vector2 {
@@ -14,10 +17,40 @@ function azToHorizontal(azDeg: number): THREE.Vector2 {
   return new THREE.Vector2(Math.sin(rad), -Math.cos(rad));
 }
 
-function sunWorldPosition(azimuthDeg: number, elevationDeg: number, distance: number): THREE.Vector3 {
+/** World position at the given azimuth/elevation, `distance` away from `anchor` (default: world origin). */
+function sunWorldPosition(
+  azimuthDeg: number,
+  elevationDeg: number,
+  distance: number,
+  anchor = new THREE.Vector3(),
+): THREE.Vector3 {
   const elRad = (elevationDeg * Math.PI) / 180;
   const dir = azToHorizontal(azimuthDeg).multiplyScalar(Math.cos(elRad));
-  return new THREE.Vector3(dir.x * distance, Math.sin(elRad) * distance, dir.y * distance);
+  return new THREE.Vector3(dir.x * distance, Math.sin(elRad) * distance, dir.y * distance).add(anchor);
+}
+
+/**
+ * Where the sun's ray actually crosses the window's (infinite) wall plane,
+ * in world space — not generally the same point as "straight ahead of the
+ * eye," since the sun is usually off to one side of the window's facing
+ * direction. Returns null when the sun is behind the wall (can't shine
+ * through a flat window from that side regardless of elevation) — same
+ * condition as geometry.ts's glareElevationBounds.
+ */
+function windowCrossingPoint(
+  sunAzimuthDeg: number,
+  sunElevationDeg: number,
+  config: SunnyConfig,
+): THREE.Vector3 | null {
+  const deltaAzRad = ((sunAzimuthDeg - config.windowAzimuthDeg) * Math.PI) / 180;
+  const cosDelta = Math.cos(deltaAzRad);
+  if (cosDelta <= 0) return null;
+
+  const t = config.distanceToWindow / cosDelta; // slant distance from the eye, along the sun's azimuth
+  const horiz = azToHorizontal(sunAzimuthDeg).multiplyScalar(t);
+  const elRad = (sunElevationDeg * Math.PI) / 180;
+  const height = config.eyeHeight + t * Math.tan(elRad);
+  return new THREE.Vector3(horiz.x, height, horiz.y);
 }
 
 /** Splits a day's sun-position samples into contiguous [start,end) runs sharing the same glare state. */
@@ -43,7 +76,9 @@ export class SunnyScene {
   private sunMesh: THREE.Mesh;
   private sunLight: THREE.DirectionalLight;
   private rayLine: THREE.Line;
-  private windowMesh: THREE.Mesh;
+  private wallMaterial: THREE.MeshStandardMaterial;
+  private wallGroup = new THREE.Group();
+  private lastWallShapeKey = "";
   private windowGroup = new THREE.Group();
   private eyeMesh: THREE.Mesh;
   private dayArcGroup = new THREE.Group();
@@ -80,21 +115,11 @@ export class SunnyScene {
     this.scene.add(grid);
 
     this.scene.add(this.windowGroup);
-    const wallMat = new THREE.MeshStandardMaterial({ color: 0x4a4f5a });
-    const wall = new THREE.Mesh(new THREE.PlaneGeometry(6, 3.2), wallMat);
-    wall.position.y = 1.6;
-    this.windowGroup.add(wall);
-
-    this.windowMesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(WINDOW_WIDTH, 1),
-      new THREE.MeshStandardMaterial({
-        color: 0x3b82f6,
-        transparent: true,
-        opacity: 0.55,
-        side: THREE.DoubleSide,
-      }),
-    );
-    this.windowGroup.add(this.windowMesh);
+    this.wallMaterial = new THREE.MeshStandardMaterial({
+      color: 0x4a4f5a,
+      side: THREE.DoubleSide,
+    });
+    this.windowGroup.add(this.wallGroup);
 
     this.eyeMesh = new THREE.Mesh(
       new THREE.SphereGeometry(0.08, 16, 16),
@@ -149,48 +174,84 @@ export class SunnyScene {
     // Face the group so its local +Z plane normal matches the outward azimuth.
     this.windowGroup.rotation.y = Math.atan2(dir.x, -dir.y);
 
-    const windowHeight = Math.max(0.05, config.windowTopHeight - config.windowSillHeight);
-    this.windowMesh.geometry.dispose();
-    this.windowMesh.geometry = new THREE.PlaneGeometry(WINDOW_WIDTH, windowHeight);
-    this.windowMesh.position.y =
-      config.windowSillHeight + windowHeight / 2;
+    this.rebuildWallIfNeeded(config);
 
-    // Sun position for the selected date/time.
+    const eyePos = new THREE.Vector3(0, config.eyeHeight, 0);
+
+    // Sun position for the selected date/time, anchored at the eye so it
+    // sits exactly along the (azimuth, elevation) line of sight from there.
     const { azimuthDeg, elevationDeg } = getSunPosition(
       date,
       config.latitude,
       config.longitude,
     );
-    const sunPos = sunWorldPosition(azimuthDeg, elevationDeg, SUN_DISTANCE);
+    const sunPos = sunWorldPosition(azimuthDeg, elevationDeg, SUN_DISTANCE, eyePos);
     this.sunMesh.position.copy(sunPos);
     this.sunMesh.visible = elevationDeg > -5;
     this.sunLight.position.copy(sunPos);
-    this.sunLight.target.position.set(0, config.eyeHeight, 0);
+    this.sunLight.target.position.copy(eyePos);
     this.sunLight.target.updateMatrixWorld();
     this.sunLight.intensity = elevationDeg > 0 ? 1.2 : 0.1;
 
     const glare = isGlare(azimuthDeg, elevationDeg, config);
 
-    // Ray from the sun through the eye, extended a bit further into the room.
-    const eyePos = new THREE.Vector3(0, config.eyeHeight, 0);
+    // Ray from the sun through the actual point where it crosses the
+    // window plane (not just "straight at the eye" — the sun is usually
+    // off to one side), through the eye, and a bit further into the room.
+    const crossing = windowCrossingPoint(azimuthDeg, elevationDeg, config);
     const beyond = eyePos
       .clone()
       .add(eyePos.clone().sub(sunPos).normalize().multiplyScalar(0.8));
-    this.rayLine.geometry.setFromPoints([sunPos, beyond]);
+    // setFromPoints() on an existing geometry reuses its buffer in place
+    // rather than resizing it — since the point count here varies (2 or 3
+    // depending on whether `crossing` exists), reusing it silently drops
+    // the extra point once it grows. Replace the geometry outright instead.
+    this.rayLine.geometry.dispose();
+    this.rayLine.geometry = new THREE.BufferGeometry().setFromPoints(
+      crossing ? [sunPos, crossing, beyond] : [sunPos, beyond],
+    );
     (this.rayLine.material as THREE.LineBasicMaterial).color.set(
       glare ? 0xff3333 : 0x888888,
     );
+  }
 
-    (this.windowMesh.material as THREE.MeshStandardMaterial).color.set(
-      glare ? 0xff5533 : 0x3b82f6,
-    );
-    (this.windowMesh.material as THREE.MeshStandardMaterial).opacity = glare
-      ? 0.85
-      : 0.55;
+  /**
+   * Builds the wall as solid panels around a real rectangular opening (the
+   * window itself is left empty — nothing drawn there — so the sun is
+   * actually visible through it rather than behind a colored pane). Only
+   * rebuilds when the opening's shape actually changed, since this runs on
+   * every store update (i.e. every animation frame during playback).
+   */
+  private rebuildWallIfNeeded(config: SunnyConfig) {
+    const key = `${config.windowWidth}|${config.windowTopHeight}|${config.windowSillHeight}`;
+    if (key === this.lastWallShapeKey) return;
+    this.lastWallShapeKey = key;
+
+    for (const child of this.wallGroup.children) {
+      (child as THREE.Mesh).geometry.dispose();
+    }
+    this.wallGroup.clear();
+
+    const wallTop = Math.max(WALL_MIN_HEIGHT, config.windowTopHeight + WALL_TOP_MARGIN);
+    const halfPlatform = PLATFORM_SIZE / 2;
+    const halfWindow = config.windowWidth / 2;
+
+    const addPanel = (width: number, height: number, cx: number, cy: number) => {
+      if (width <= 0.01 || height <= 0.01) return;
+      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, height), this.wallMaterial);
+      mesh.position.set(cx, cy, 0);
+      this.wallGroup.add(mesh);
+    };
+
+    const sideWidth = halfPlatform - halfWindow;
+    addPanel(sideWidth, wallTop, -(halfWindow + sideWidth / 2), wallTop / 2); // left of the window
+    addPanel(sideWidth, wallTop, halfWindow + sideWidth / 2, wallTop / 2); // right of the window
+    addPanel(config.windowWidth, wallTop - config.windowTopHeight, 0, config.windowTopHeight + (wallTop - config.windowTopHeight) / 2); // header above
+    addPanel(config.windowWidth, config.windowSillHeight, 0, config.windowSillHeight / 2); // sill below, if any
   }
 
   /** Draws the current day's full sun path across the sky, with the glare portion highlighted in red. */
-  setDayArc(points: DayArcPoint[]) {
+  setDayArc(points: DayArcPoint[], eyeHeight: number) {
     for (const child of this.dayArcGroup.children) {
       (child as THREE.Line).geometry.dispose();
       ((child as THREE.Line).material as THREE.Material).dispose();
@@ -199,7 +260,8 @@ export class SunnyScene {
 
     if (points.length < 2) return;
 
-    const positions = points.map((p) => sunWorldPosition(p.azimuthDeg, p.elevationDeg, SUN_DISTANCE));
+    const eyePos = new THREE.Vector3(0, eyeHeight, 0);
+    const positions = points.map((p) => sunWorldPosition(p.azimuthDeg, p.elevationDeg, SUN_DISTANCE, eyePos));
 
     for (const run of glareRuns(points)) {
       const segment = positions.slice(run.start, run.end);

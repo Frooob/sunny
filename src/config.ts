@@ -15,6 +15,8 @@ export interface SunnyConfig {
   windowSillHeight: number;
   /** Window top edge height above the floor, meters. */
   windowTopHeight: number;
+  /** Window width, meters — centered on the eye point (half on each side). */
+  windowWidth: number;
 
   /** Eye/desk height above the floor, meters. */
   eyeHeight: number;
@@ -32,6 +34,7 @@ export const defaultConfig: SunnyConfig = {
   windowAzimuthDeg: windowAzimuthFromLine(windowLineStart, windowLineEnd),
   windowSillHeight: 0,
   windowTopHeight: 2.5,
+  windowWidth: 3,
   eyeHeight: 1.2,
   distanceToWindow: 2,
 };

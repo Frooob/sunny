@@ -53,6 +53,16 @@ export function glareElevationBounds(
   return { minElevationDeg, maxElevationDeg };
 }
 
+/**
+ * How far sideways (meters, signed) along the window's wall the ray
+ * crosses it, relative to straight-ahead of the eye. The window is
+ * centered on the eye, so a real (non-infinite) window only catches rays
+ * with |lateralOffsetMeters| <= windowWidth / 2.
+ */
+export function lateralOffsetMeters(deltaAzDeg: number, config: SunnyConfig): number {
+  return config.distanceToWindow * Math.tan((deltaAzDeg * Math.PI) / 180);
+}
+
 /** Whether the sun, at this azimuth/elevation, is currently shining through the window onto the eye point. */
 export function isGlare(
   sunAzimuthDeg: number,
@@ -67,8 +77,9 @@ export function isGlare(
   const bounds = glareElevationBounds(deltaAz, config);
   if (!bounds) return false;
 
-  return (
-    sunElevationDeg >= bounds.minElevationDeg &&
-    sunElevationDeg <= bounds.maxElevationDeg
-  );
+  if (sunElevationDeg < bounds.minElevationDeg || sunElevationDeg > bounds.maxElevationDeg) {
+    return false;
+  }
+
+  return Math.abs(lateralOffsetMeters(deltaAz, config)) <= config.windowWidth / 2;
 }

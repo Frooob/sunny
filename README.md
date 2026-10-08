@@ -19,8 +19,8 @@ All inputs live in the side panel and update the simulation live:
 
 - **Location**: latitude/longitude
 - **Window & desk geometry**: window azimuth (degrees), window sill/top
-  height, eye height, distance from eye to window (all relative to the
-  room's own floor)
+  height, window width (centered on the eye point), eye height, distance
+  from eye to window (all relative to the room's own floor)
 - **Date & time**: scrub through a day; the 3D view and current-state
   readout update accordingly
 - **Watch the year play out**: animate the date/time forward, in one of

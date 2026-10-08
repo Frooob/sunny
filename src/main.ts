@@ -22,7 +22,7 @@ store.subscribe((state) => {
   const key = `${state.date.toDateString()}|${JSON.stringify(state.config)}`;
   if (key !== lastArcKey) {
     lastArcKey = key;
-    scene.setDayArc(computeDayArc(state.date, state.config));
+    scene.setDayArc(computeDayArc(state.date, state.config), state.config.eyeHeight);
   }
 });
 

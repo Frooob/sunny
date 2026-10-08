@@ -41,6 +41,7 @@ export function mountControlPanel(container: HTMLElement, store: Store, playback
       ${numberField("Window azimuth (°)", "windowAzimuthDeg", 0.1, store)}
       ${numberField("Window sill height (m)", "windowSillHeight", 0.1, store)}
       ${numberField("Window top height (m)", "windowTopHeight", 0.1, store)}
+      ${numberField("Window width (m)", "windowWidth", 0.1, store)}
       ${numberField("Eye height (m)", "eyeHeight", 0.05, store)}
       ${numberField("Distance to window (m)", "distanceToWindow", 0.1, store)}
     </section>
