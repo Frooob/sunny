@@ -3,14 +3,35 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import type { AppState } from "./state.ts";
 import { getSunPosition } from "./solar.ts";
 import { isGlare } from "./geometry.ts";
+import type { DayArcPoint } from "./dayarc.ts";
 
-const SUN_DISTANCE = 30;
+const SUN_DISTANCE = 16;
 const WINDOW_WIDTH = 3;
 
 /** Compass azimuth (deg, 0=N clockwise) -> horizontal unit vector, north=-Z, east=+X. */
 function azToHorizontal(azDeg: number): THREE.Vector2 {
   const rad = (azDeg * Math.PI) / 180;
   return new THREE.Vector2(Math.sin(rad), -Math.cos(rad));
+}
+
+function sunWorldPosition(azimuthDeg: number, elevationDeg: number, distance: number): THREE.Vector3 {
+  const elRad = (elevationDeg * Math.PI) / 180;
+  const dir = azToHorizontal(azimuthDeg).multiplyScalar(Math.cos(elRad));
+  return new THREE.Vector3(dir.x * distance, Math.sin(elRad) * distance, dir.y * distance);
+}
+
+/** Splits a day's sun-position samples into contiguous [start,end) runs sharing the same glare state. */
+function glareRuns(points: DayArcPoint[]): { start: number; end: number; glare: boolean }[] {
+  const runs: { start: number; end: number; glare: boolean }[] = [];
+  for (let i = 0; i < points.length; i++) {
+    const glare = points[i].glare;
+    if (runs.length > 0 && runs[runs.length - 1].glare === glare) {
+      runs[runs.length - 1].end = i + 1;
+    } else {
+      runs.push({ start: i, end: i + 1, glare });
+    }
+  }
+  return runs;
 }
 
 export class SunnyScene {
@@ -25,6 +46,7 @@ export class SunnyScene {
   private windowMesh: THREE.Mesh;
   private windowGroup = new THREE.Group();
   private eyeMesh: THREE.Mesh;
+  private dayArcGroup = new THREE.Group();
 
   constructor(container: HTMLElement) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -33,12 +55,14 @@ export class SunnyScene {
 
     this.scene.background = new THREE.Color(0x0b1020);
 
-    this.camera = new THREE.PerspectiveCamera(50, 1, 0.1, 200);
-    this.camera.position.set(8, 6, 10);
+    this.camera = new THREE.PerspectiveCamera(65, 1, 0.1, 200);
+    this.camera.position.set(14, 8, 2);
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
-    this.controls.target.set(0, 1.2, 0);
+    this.controls.target.set(0, 2, 0);
     this.controls.enableDamping = true;
+    this.controls.minDistance = 3;
+    this.controls.maxDistance = 60;
 
     this.scene.add(new THREE.AmbientLight(0x667799, 0.6));
 
@@ -94,6 +118,8 @@ export class SunnyScene {
     );
     this.scene.add(this.rayLine);
 
+    this.scene.add(this.dayArcGroup);
+
     this.resize(container);
     new ResizeObserver(() => this.resize(container)).observe(container);
 
@@ -135,13 +161,7 @@ export class SunnyScene {
       config.latitude,
       config.longitude,
     );
-    const elRad = (elevationDeg * Math.PI) / 180;
-    const sunDir = azToHorizontal(azimuthDeg).multiplyScalar(Math.cos(elRad));
-    const sunPos = new THREE.Vector3(
-      sunDir.x * SUN_DISTANCE,
-      Math.sin(elRad) * SUN_DISTANCE,
-      sunDir.y * SUN_DISTANCE,
-    );
+    const sunPos = sunWorldPosition(azimuthDeg, elevationDeg, SUN_DISTANCE);
     this.sunMesh.position.copy(sunPos);
     this.sunMesh.visible = elevationDeg > -5;
     this.sunLight.position.copy(sunPos);
@@ -167,5 +187,32 @@ export class SunnyScene {
     (this.windowMesh.material as THREE.MeshStandardMaterial).opacity = glare
       ? 0.85
       : 0.55;
+  }
+
+  /** Draws the current day's full sun path across the sky, with the glare portion highlighted in red. */
+  setDayArc(points: DayArcPoint[]) {
+    for (const child of this.dayArcGroup.children) {
+      (child as THREE.Line).geometry.dispose();
+      ((child as THREE.Line).material as THREE.Material).dispose();
+    }
+    this.dayArcGroup.clear();
+
+    if (points.length < 2) return;
+
+    const positions = points.map((p) => sunWorldPosition(p.azimuthDeg, p.elevationDeg, SUN_DISTANCE));
+
+    for (const run of glareRuns(points)) {
+      const segment = positions.slice(run.start, run.end);
+      if (segment.length < 2) continue;
+      const line = new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints(segment),
+        new THREE.LineBasicMaterial({
+          color: run.glare ? 0xff3333 : 0xffdd55,
+          transparent: true,
+          opacity: run.glare ? 0.95 : 0.35,
+        }),
+      );
+      this.dayArcGroup.add(line);
+    }
   }
 }

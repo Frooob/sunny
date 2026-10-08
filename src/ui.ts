@@ -3,6 +3,7 @@ import type { SunnyConfig } from "./config.ts";
 import { getSunPosition } from "./solar.ts";
 import { glareElevationBounds, isGlare } from "./geometry.ts";
 import { findGlareIntervals } from "./dataset.ts";
+import type { Playback } from "./playback.ts";
 
 function numberField(
   label: string,
@@ -23,7 +24,7 @@ function fmtHM(d: Date): string {
   return d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
 }
 
-export function mountControlPanel(container: HTMLElement, store: Store) {
+export function mountControlPanel(container: HTMLElement, store: Store, playback: Playback) {
   container.innerHTML = `
     <h1>Sunny</h1>
     <p class="subtitle">Window-glare simulator</p>
@@ -54,6 +55,23 @@ export function mountControlPanel(container: HTMLElement, store: Store) {
       </div>
       <div class="field">
         <label id="f-time-label" style="color:#c3c9db"></label>
+      </div>
+    </section>
+
+    <section>
+      <h2>Watch the year play out</h2>
+      <p class="subtitle" style="margin-bottom: 10px;">
+        Steps through the year, skipping nights, so you can watch the sun's
+        daily path rise, fall, and swing in and out of the window.
+      </p>
+      <div class="field">
+        <button id="f-play" type="button" style="width: auto; flex: 1 1 auto;">▶ Play</button>
+        <select id="f-speed" style="background:#0b1020; color:#e6e8ef; border:1px solid #334165; border-radius:4px; padding:6px;">
+          <option value="0.3">Slow</option>
+          <option value="1.5" selected>Normal</option>
+          <option value="6">Fast</option>
+          <option value="20">Very fast</option>
+        </select>
       </div>
     </section>
 
@@ -94,6 +112,7 @@ export function mountControlPanel(container: HTMLElement, store: Store) {
   }
 
   dateInput.addEventListener("change", () => {
+    playback.pause();
     const [y, m, d] = dateInput.value.split("-").map(Number);
     const current = store.get().date;
     const next = new Date(current);
@@ -102,11 +121,23 @@ export function mountControlPanel(container: HTMLElement, store: Store) {
   });
 
   timeInput.addEventListener("input", () => {
+    playback.pause();
     const minutes = parseInt(timeInput.value, 10);
     const current = store.get().date;
     const next = new Date(current);
     next.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0);
     store.update({ date: next });
+  });
+
+  const playBtn = container.querySelector("#f-play") as HTMLButtonElement;
+  const speedSelect = container.querySelector("#f-speed") as HTMLSelectElement;
+
+  playBtn.addEventListener("click", () => playback.toggle());
+  speedSelect.addEventListener("change", () => {
+    playback.daysPerSecond = parseFloat(speedSelect.value);
+  });
+  playback.onPlayStateChange((playing) => {
+    playBtn.textContent = playing ? "⏸ Pause" : "▶ Play";
   });
 
   const readout = container.querySelector("#readout") as HTMLElement;

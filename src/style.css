@@ -32,6 +32,30 @@ body {
 #scene-container {
   flex: 1 1 auto;
   min-width: 0;
+  position: relative;
+}
+
+#scene-overlay {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  padding: 8px 14px;
+  background: rgba(11, 16, 32, 0.7);
+  border: 1px solid #334165;
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1.5;
+  pointer-events: none;
+  backdrop-filter: blur(2px);
+}
+
+#scene-overlay .glare-yes {
+  color: #ff6b5e;
+  font-weight: 600;
+}
+
+#scene-overlay .glare-no {
+  color: #8891a7;
 }
 
 #panel {
