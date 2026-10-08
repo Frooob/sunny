@@ -25,7 +25,8 @@ All inputs live in the side panel and update the simulation live:
   readout update accordingly
 - **Watch the year play out**: animate the date/time forward, in one of
   three modes:
-  - *Full day sweep* — plays through real time, skipping nights
+  - *Full day sweep* — plays through real time, night included (the sun
+    just goes dark while it's down)
   - *Fixed time each day* — jumps day by day at one chosen clock time, so
     you watch that moment's sun position shift across the year
   - *Daily glare onset* — jumps day by day to the moment glare first

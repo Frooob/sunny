@@ -158,7 +158,7 @@ export function mountControlPanel(container: HTMLElement, store: Store, playback
 
   const MODE_CAPTIONS: Record<PlaybackMode, string> = {
     continuous:
-      "Steps through the year, skipping nights, so you can watch the sun's daily path rise, fall, and swing in and out of the window.",
+      "Steps through the year in real time (night included — the sun just goes dark while it's down), so you can watch its daily path rise, fall, and swing in and out of the window.",
     fixedTime:
       "Jumps day by day, always at the same clock time, so you can watch how the sun's position at that one moment shifts across the year.",
     glareOnset:

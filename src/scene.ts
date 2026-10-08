@@ -21,6 +21,9 @@ const OVERVIEW_MAX_DISTANCE = 60;
 // get away with; min=max locks out zoom/dolly entirely.
 const EYE_VIEW_DISTANCE = 0.01;
 
+const SUN_DAY_COLOR = 0xffdd55;
+const SUN_NIGHT_COLOR = 0x3a3f55; // dim, not hidden — the sun is still "there", just set
+
 /** Compass azimuth (deg, 0=N clockwise) -> horizontal unit vector, north=-Z, east=+X. */
 function azToHorizontal(azDeg: number): THREE.Vector2 {
   const rad = (azDeg * Math.PI) / 180;
@@ -142,7 +145,7 @@ export class SunnyScene {
 
     this.sunMesh = new THREE.Mesh(
       new THREE.SphereGeometry(0.6, 16, 16),
-      new THREE.MeshBasicMaterial({ color: 0xffdd55 }),
+      new THREE.MeshBasicMaterial({ color: SUN_DAY_COLOR }),
     );
     this.scene.add(this.sunMesh);
 
@@ -210,7 +213,9 @@ export class SunnyScene {
     );
     const sunPos = sunWorldPosition(azimuthDeg, elevationDeg, SUN_DISTANCE, eyePos);
     this.sunMesh.position.copy(sunPos);
-    this.sunMesh.visible = elevationDeg > -5;
+    (this.sunMesh.material as THREE.MeshBasicMaterial).color.set(
+      elevationDeg > 0 ? SUN_DAY_COLOR : SUN_NIGHT_COLOR,
+    );
     this.sunLight.position.copy(sunPos);
     this.sunLight.target.position.copy(eyePos);
     this.sunLight.target.updateMatrixWorld();
