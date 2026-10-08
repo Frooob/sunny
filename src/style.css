@@ -103,6 +103,11 @@ body {
   margin-bottom: 8px;
 }
 
+/* Author styles beat the UA [hidden] default, so re-assert it explicitly. */
+.field[hidden] {
+  display: none;
+}
+
 .field label {
   color: #c3c9db;
   flex: 1 1 auto;

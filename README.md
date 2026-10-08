@@ -23,6 +23,17 @@ All inputs live in the side panel and update the simulation live:
   room's own floor)
 - **Date & time**: scrub through a day; the 3D view and current-state
   readout update accordingly
+- **Watch the year play out**: animate the date/time forward, in one of
+  three modes:
+  - *Full day sweep* — plays through real time, skipping nights
+  - *Fixed time each day* — jumps day by day at one chosen clock time, so
+    you watch that moment's sun position shift across the year
+  - *Daily glare onset* — jumps day by day to the moment glare first
+    starts that day
+  
+  The latter two offer a **Local / UTC** time reference: local time steps
+  by calendar day in your timezone (and jumps an hour at DST transitions,
+  matching your actual clock); UTC steps by real 24h days with no jump.
 
 Defaults are pre-filled from the real geometry this was built for (see
 `src/config.ts`).

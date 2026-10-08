@@ -3,7 +3,8 @@ import type { SunnyConfig } from "./config.ts";
 import { getSunPosition } from "./solar.ts";
 import { glareElevationBounds, isGlare } from "./geometry.ts";
 import { findGlareIntervals } from "./dataset.ts";
-import type { Playback } from "./playback.ts";
+import type { Playback, PlaybackMode } from "./playback.ts";
+import type { TimeReference } from "./timeref.ts";
 
 function numberField(
   label: string,
@@ -60,10 +61,26 @@ export function mountControlPanel(container: HTMLElement, store: Store, playback
 
     <section>
       <h2>Watch the year play out</h2>
-      <p class="subtitle" style="margin-bottom: 10px;">
-        Steps through the year, skipping nights, so you can watch the sun's
-        daily path rise, fall, and swing in and out of the window.
-      </p>
+      <p class="subtitle" id="f-mode-caption" style="margin-bottom: 10px;"></p>
+      <div class="field">
+        <label for="f-mode">Mode</label>
+        <select id="f-mode" style="background:#0b1020; color:#e6e8ef; border:1px solid #334165; border-radius:4px; padding:6px;">
+          <option value="continuous" selected>Full day sweep</option>
+          <option value="fixedTime">Fixed time each day</option>
+          <option value="glareOnset">Daily glare onset</option>
+        </select>
+      </div>
+      <div class="field" id="f-fixedtime-row" hidden>
+        <label for="f-fixedtime">Time of day</label>
+        <input id="f-fixedtime" type="time" step="60" value="17:00" />
+      </div>
+      <div class="field" id="f-timeref-row" hidden>
+        <label for="f-timeref">Time reference</label>
+        <select id="f-timeref" style="background:#0b1020; color:#e6e8ef; border:1px solid #334165; border-radius:4px; padding:6px;">
+          <option value="local" selected>Local (your clock)</option>
+          <option value="utc">UTC (no DST jump)</option>
+        </select>
+      </div>
       <div class="field">
         <button id="f-play" type="button" style="width: auto; flex: 1 1 auto;">▶ Play</button>
         <select id="f-speed" style="background:#0b1020; color:#e6e8ef; border:1px solid #334165; border-radius:4px; padding:6px;">
@@ -131,10 +148,44 @@ export function mountControlPanel(container: HTMLElement, store: Store, playback
 
   const playBtn = container.querySelector("#f-play") as HTMLButtonElement;
   const speedSelect = container.querySelector("#f-speed") as HTMLSelectElement;
+  const modeSelect = container.querySelector("#f-mode") as HTMLSelectElement;
+  const modeCaption = container.querySelector("#f-mode-caption") as HTMLElement;
+  const fixedTimeRow = container.querySelector("#f-fixedtime-row") as HTMLElement;
+  const fixedTimeInput = container.querySelector("#f-fixedtime") as HTMLInputElement;
+  const timeRefRow = container.querySelector("#f-timeref-row") as HTMLElement;
+  const timeRefSelect = container.querySelector("#f-timeref") as HTMLSelectElement;
+
+  const MODE_CAPTIONS: Record<PlaybackMode, string> = {
+    continuous:
+      "Steps through the year, skipping nights, so you can watch the sun's daily path rise, fall, and swing in and out of the window.",
+    fixedTime:
+      "Jumps day by day, always at the same clock time, so you can watch how the sun's position at that one moment shifts across the year.",
+    glareOnset:
+      "Jumps day by day, landing each time on the moment the glare first starts that day (skipping any day with none).",
+  };
+
+  function updateModeVisibility(mode: PlaybackMode) {
+    modeCaption.textContent = MODE_CAPTIONS[mode];
+    fixedTimeRow.hidden = mode !== "fixedTime";
+    timeRefRow.hidden = mode === "continuous";
+  }
+  updateModeVisibility(playback.mode);
 
   playBtn.addEventListener("click", () => playback.toggle());
   speedSelect.addEventListener("change", () => {
     playback.daysPerSecond = parseFloat(speedSelect.value);
+  });
+  modeSelect.addEventListener("change", () => {
+    const mode = modeSelect.value as PlaybackMode;
+    playback.setMode(mode);
+    updateModeVisibility(mode);
+  });
+  fixedTimeInput.addEventListener("change", () => {
+    const [h, m] = fixedTimeInput.value.split(":").map(Number);
+    playback.setFixedTimeMinutes(h * 60 + m);
+  });
+  timeRefSelect.addEventListener("change", () => {
+    playback.setTimeReference(timeRefSelect.value as TimeReference);
   });
   playback.onPlayStateChange((playing) => {
     playBtn.textContent = playing ? "⏸ Pause" : "▶ Play";

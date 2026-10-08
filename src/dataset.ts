@@ -1,6 +1,7 @@
 import type { SunnyConfig } from "./config.ts";
 import { getSunPosition } from "./solar.ts";
 import { isGlare } from "./geometry.ts";
+import { startOfDay, type TimeReference } from "./timeref.ts";
 
 export interface GlareInterval {
   start: Date;
@@ -8,19 +9,20 @@ export interface GlareInterval {
 }
 
 /**
- * Scans one calendar day (local time) minute-by-minute and returns the
- * contiguous time ranges during which the sun shines through the window
- * onto the eye point. Usually 0 or 1 interval per day, but a window facing
- * close to a solstice sunset/sunrise azimuth can in principle produce more
- * than one, so this returns a list.
+ * Scans one calendar day minute-by-minute and returns the contiguous time
+ * ranges during which the sun shines through the window onto the eye
+ * point. Usually 0 or 1 interval per day, but a window facing close to a
+ * solstice sunset/sunrise azimuth can in principle produce more than one,
+ * so this returns a list. `ref` picks whether the calendar day runs
+ * local-midnight-to-local-midnight or UTC-midnight-to-UTC-midnight.
  */
 export function findGlareIntervals(
   date: Date,
   config: SunnyConfig,
   stepMinutes = 1,
+  ref: TimeReference = "local",
 ): GlareInterval[] {
-  const dayStart = new Date(date);
-  dayStart.setHours(0, 0, 0, 0);
+  const dayStart = startOfDay(date, ref);
 
   const intervals: GlareInterval[] = [];
   let currentStart: Date | null = null;
