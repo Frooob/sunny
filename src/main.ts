@@ -42,6 +42,17 @@ store.subscribe((state) => {
   `;
 });
 
+const povBtn = document.querySelector<HTMLButtonElement>("#pov-toggle")!;
+povBtn.addEventListener("click", () => {
+  if (scene.isInEyeView) {
+    scene.exitEyeView();
+  } else {
+    scene.enterEyeView(store.get().config);
+  }
+  povBtn.textContent = scene.isInEyeView ? "Back to overview" : "View from desk";
+  povBtn.classList.toggle("active", scene.isInEyeView);
+});
+
 const panel = document.querySelector<HTMLElement>("#panel")!;
 mountControlPanel(panel, store, playback);
 

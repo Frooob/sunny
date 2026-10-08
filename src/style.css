@@ -58,6 +58,24 @@ body {
   color: #8891a7;
 }
 
+#pov-toggle {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: auto;
+  padding: 8px 14px;
+  font-size: 13px;
+  background: rgba(11, 16, 32, 0.7);
+  border: 1px solid #334165;
+  border-radius: 6px;
+  backdrop-filter: blur(2px);
+}
+
+#pov-toggle.active {
+  background: #2a3a66;
+  border-color: #3a4a7a;
+}
+
 #panel {
   flex: 0 0 340px;
   overflow-y: auto;

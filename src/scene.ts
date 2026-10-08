@@ -11,6 +11,16 @@ const PLATFORM_SIZE = 14; // matches the floor/grid extent — the wall runs edg
 const WALL_MIN_HEIGHT = 3.4;
 const WALL_TOP_MARGIN = 0.6; // headroom kept above the window top, whatever it's configured to
 
+const OVERVIEW_CAMERA_POS = new THREE.Vector3(14, 8, 2);
+const OVERVIEW_TARGET = new THREE.Vector3(0, 2, 0);
+const OVERVIEW_MIN_DISTANCE = 3;
+const OVERVIEW_MAX_DISTANCE = 60;
+// A head can turn but not move, so the eye-view "orbit" is really just
+// rotation in place — OrbitControls needs a nonzero camera-to-target
+// distance to define an orbit at all, so this is as close to 0 as it can
+// get away with; min=max locks out zoom/dolly entirely.
+const EYE_VIEW_DISTANCE = 0.01;
+
 /** Compass azimuth (deg, 0=N clockwise) -> horizontal unit vector, north=-Z, east=+X. */
 function azToHorizontal(azDeg: number): THREE.Vector2 {
   const rad = (azDeg * Math.PI) / 180;
@@ -83,6 +93,9 @@ export class SunnyScene {
   private eyeMesh: THREE.Mesh;
   private dayArcGroup = new THREE.Group();
 
+  private inEyeView = false;
+  private lastEyeViewKey = "";
+
   constructor(container: HTMLElement) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setPixelRatio(window.devicePixelRatio);
@@ -91,13 +104,13 @@ export class SunnyScene {
     this.scene.background = new THREE.Color(0x0b1020);
 
     this.camera = new THREE.PerspectiveCamera(65, 1, 0.1, 200);
-    this.camera.position.set(14, 8, 2);
+    this.camera.position.copy(OVERVIEW_CAMERA_POS);
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
-    this.controls.target.set(0, 2, 0);
+    this.controls.target.copy(OVERVIEW_TARGET);
     this.controls.enableDamping = true;
-    this.controls.minDistance = 3;
-    this.controls.maxDistance = 60;
+    this.controls.minDistance = OVERVIEW_MIN_DISTANCE;
+    this.controls.maxDistance = OVERVIEW_MAX_DISTANCE;
 
     this.scene.add(new THREE.AmbientLight(0x667799, 0.6));
 
@@ -176,6 +189,16 @@ export class SunnyScene {
 
     this.rebuildWallIfNeeded(config);
 
+    // If we're in the desk POV and the user tweaks a parameter that moves
+    // the eye or the window it's looking at, keep the view anchored rather
+    // than leaving it pointed at the old position.
+    if (this.inEyeView) {
+      const eyeViewKey = `${config.eyeHeight}|${config.windowAzimuthDeg}`;
+      if (eyeViewKey !== this.lastEyeViewKey) {
+        this.snapToEyeView(config);
+      }
+    }
+
     const eyePos = new THREE.Vector3(0, config.eyeHeight, 0);
 
     // Sun position for the selected date/time, anchored at the eye so it
@@ -213,6 +236,46 @@ export class SunnyScene {
     (this.rayLine.material as THREE.LineBasicMaterial).color.set(
       glare ? 0xff3333 : 0x888888,
     );
+  }
+
+  get isInEyeView(): boolean {
+    return this.inEyeView;
+  }
+
+  /** Switches the camera to the sitting person's point of view, looking out through the window — rotation only, no zoom/pan, since a head turns but doesn't move. */
+  enterEyeView(config: SunnyConfig) {
+    this.inEyeView = true;
+    this.controls.minDistance = EYE_VIEW_DISTANCE;
+    this.controls.maxDistance = EYE_VIEW_DISTANCE;
+    this.controls.enableZoom = false;
+    this.controls.enablePan = false;
+    this.snapToEyeView(config);
+  }
+
+  /** Returns the camera to the default overview of the room. */
+  exitEyeView() {
+    this.inEyeView = false;
+    this.lastEyeViewKey = "";
+    this.controls.minDistance = OVERVIEW_MIN_DISTANCE;
+    this.controls.maxDistance = OVERVIEW_MAX_DISTANCE;
+    this.controls.enableZoom = true;
+    this.controls.enablePan = true;
+    this.camera.position.copy(OVERVIEW_CAMERA_POS);
+    this.controls.target.copy(OVERVIEW_TARGET);
+    this.controls.update();
+  }
+
+  private snapToEyeView(config: SunnyConfig) {
+    this.lastEyeViewKey = `${config.eyeHeight}|${config.windowAzimuthDeg}`;
+    const eyePos = new THREE.Vector3(0, config.eyeHeight, 0);
+    const lookDir = azToHorizontal(config.windowAzimuthDeg);
+    this.camera.position.copy(eyePos);
+    this.controls.target.set(
+      eyePos.x + lookDir.x * EYE_VIEW_DISTANCE,
+      eyePos.y,
+      eyePos.z + lookDir.y * EYE_VIEW_DISTANCE,
+    );
+    this.controls.update();
   }
 
   /**
