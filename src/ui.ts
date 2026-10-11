@@ -4,7 +4,8 @@ import { getSunPosition } from "./solar.ts";
 import { glareElevationBounds, isGlare } from "./geometry.ts";
 import { findGlareIntervals } from "./dataset.ts";
 import type { Playback, PlaybackMode } from "./playback.ts";
-import type { TimeReference } from "./timeref.ts";
+import { dayOfYear, isLeapYear, withDayOfYear, type TimeReference } from "./timeref.ts";
+import type { SunnyScene } from "./scene.ts";
 
 function numberField(
   label: string,
@@ -25,7 +26,16 @@ function fmtHM(d: Date): string {
   return d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
 }
 
-export function mountControlPanel(container: HTMLElement, store: Store, playback: Playback) {
+function fmtHM_UTC(d: Date): string {
+  return d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" });
+}
+
+export function mountControlPanel(
+  container: HTMLElement,
+  store: Store,
+  playback: Playback,
+  scene: SunnyScene,
+) {
   container.innerHTML = `
     <h1>Sunny</h1>
     <p class="subtitle">Window-glare simulator</p>
@@ -53,10 +63,32 @@ export function mountControlPanel(container: HTMLElement, store: Store, playback
         <input id="f-date" type="date" />
       </div>
       <div class="field">
+        <input id="f-dayofyear" type="range" min="1" max="365" step="1" />
+      </div>
+      <div class="field">
+        <label id="f-dayofyear-label" style="color:#c3c9db"></label>
+      </div>
+      <div class="field">
         <input id="f-time" type="range" min="0" max="1439" step="1" />
+        <select id="f-time-slider-ref" style="background:#0b1020; color:#e6e8ef; border:1px solid #334165; border-radius:4px; padding:6px;">
+          <option value="local" selected>Local</option>
+          <option value="utc">UTC</option>
+        </select>
       </div>
       <div class="field">
         <label id="f-time-label" style="color:#c3c9db"></label>
+      </div>
+    </section>
+
+    <section>
+      <h2>Track the sun</h2>
+      <p class="subtitle" style="margin-bottom: 10px;">
+        Records every sun position visited — by playback or by dragging a
+        slider above — into a trail in the 3D view, until cleared.
+      </p>
+      <div class="field">
+        <button id="f-track" type="button" style="width: auto; flex: 1 1 auto;">Start tracking</button>
+        <button id="f-track-clear" type="button" style="width: auto;">Clear track</button>
       </div>
     </section>
 
@@ -75,13 +107,7 @@ export function mountControlPanel(container: HTMLElement, store: Store, playback
         <label for="f-fixedtime">Time of day</label>
         <input id="f-fixedtime" type="time" step="60" value="17:00" />
       </div>
-      <div class="field" id="f-timeref-row" hidden>
-        <label for="f-timeref">Time reference</label>
-        <select id="f-timeref" style="background:#0b1020; color:#e6e8ef; border:1px solid #334165; border-radius:4px; padding:6px;">
-          <option value="local" selected>Local (your clock)</option>
-          <option value="utc">UTC (no DST jump)</option>
-        </select>
-      </div>
+      <p class="subtitle" id="f-timeref-note" style="margin-bottom: 10px;"></p>
       <div class="field">
         <button id="f-play" type="button" style="width: auto; flex: 1 1 auto;">▶ Play</button>
         <select id="f-speed" style="background:#0b1020; color:#e6e8ef; border:1px solid #334165; border-radius:4px; padding:6px;">
@@ -116,17 +142,41 @@ export function mountControlPanel(container: HTMLElement, store: Store, playback
   });
 
   const dateInput = container.querySelector("#f-date") as HTMLInputElement;
+  const dayOfYearInput = container.querySelector("#f-dayofyear") as HTMLInputElement;
+  const dayOfYearLabel = container.querySelector("#f-dayofyear-label") as HTMLElement;
   const timeInput = container.querySelector("#f-time") as HTMLInputElement;
   const timeLabel = container.querySelector("#f-time-label") as HTMLElement;
+  const timeRefSelect = container.querySelector("#f-time-slider-ref") as HTMLSelectElement;
+
+  // One shared Local/UTC setting — it's the single source of truth for both
+  // how this time slider reads/writes and how day-stepping playback jumps
+  // between days (playback.timeReference). Two separate controls for what
+  // looks like the same setting is exactly the kind of thing that gets one
+  // of them set and the other missed.
+  function currentTimeRef(): TimeReference {
+    return playback.timeReference;
+  }
 
   function setDateTimeInputsFrom(date: Date) {
-    const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, "0");
-    const d = String(date.getDate()).padStart(2, "0");
+    const ref = currentTimeRef();
+    const y = ref === "utc" ? date.getUTCFullYear() : date.getFullYear();
+    const m = String((ref === "utc" ? date.getUTCMonth() : date.getMonth()) + 1).padStart(2, "0");
+    const d = String(ref === "utc" ? date.getUTCDate() : date.getDate()).padStart(2, "0");
     dateInput.value = `${y}-${m}-${d}`;
-    const minutes = date.getHours() * 60 + date.getMinutes();
-    timeInput.value = String(minutes);
-    timeLabel.textContent = fmtHM(date);
+
+    const yearLength = isLeapYear(y) ? 366 : 365;
+    const doy = dayOfYear(date, ref);
+    dayOfYearInput.max = String(yearLength);
+    dayOfYearInput.value = String(doy);
+    dayOfYearLabel.textContent = `Day ${doy} of ${yearLength}`;
+
+    if (ref === "utc") {
+      timeInput.value = String(date.getUTCHours() * 60 + date.getUTCMinutes());
+      timeLabel.textContent = `${fmtHM_UTC(date)} UTC`;
+    } else {
+      timeInput.value = String(date.getHours() * 60 + date.getMinutes());
+      timeLabel.textContent = fmtHM(date);
+    }
   }
 
   dateInput.addEventListener("change", () => {
@@ -134,7 +184,18 @@ export function mountControlPanel(container: HTMLElement, store: Store, playback
     const [y, m, d] = dateInput.value.split("-").map(Number);
     const current = store.get().date;
     const next = new Date(current);
-    next.setFullYear(y, m - 1, d);
+    if (currentTimeRef() === "utc") {
+      next.setUTCFullYear(y, m - 1, d);
+    } else {
+      next.setFullYear(y, m - 1, d);
+    }
+    store.update({ date: next });
+  });
+
+  dayOfYearInput.addEventListener("input", () => {
+    playback.pause();
+    const day = parseInt(dayOfYearInput.value, 10);
+    const next = withDayOfYear(store.get().date, day, currentTimeRef());
     store.update({ date: next });
   });
 
@@ -143,8 +204,17 @@ export function mountControlPanel(container: HTMLElement, store: Store, playback
     const minutes = parseInt(timeInput.value, 10);
     const current = store.get().date;
     const next = new Date(current);
-    next.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0);
+    if (currentTimeRef() === "utc") {
+      next.setUTCHours(Math.floor(minutes / 60), minutes % 60, 0, 0);
+    } else {
+      next.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0);
+    }
     store.update({ date: next });
+  });
+
+  timeRefSelect.addEventListener("change", () => {
+    playback.setTimeReference(timeRefSelect.value as TimeReference);
+    setDateTimeInputsFrom(store.get().date);
   });
 
   const playBtn = container.querySelector("#f-play") as HTMLButtonElement;
@@ -153,8 +223,7 @@ export function mountControlPanel(container: HTMLElement, store: Store, playback
   const modeCaption = container.querySelector("#f-mode-caption") as HTMLElement;
   const fixedTimeRow = container.querySelector("#f-fixedtime-row") as HTMLElement;
   const fixedTimeInput = container.querySelector("#f-fixedtime") as HTMLInputElement;
-  const timeRefRow = container.querySelector("#f-timeref-row") as HTMLElement;
-  const timeRefSelect = container.querySelector("#f-timeref") as HTMLSelectElement;
+  const timeRefNote = container.querySelector("#f-timeref-note") as HTMLElement;
 
   const MODE_CAPTIONS: Record<PlaybackMode, string> = {
     continuous:
@@ -168,7 +237,9 @@ export function mountControlPanel(container: HTMLElement, store: Store, playback
   function updateModeVisibility(mode: PlaybackMode) {
     modeCaption.textContent = MODE_CAPTIONS[mode];
     fixedTimeRow.hidden = mode !== "fixedTime";
-    timeRefRow.hidden = mode === "continuous";
+    timeRefNote.hidden = mode === "continuous";
+    timeRefNote.textContent =
+      "Uses the Local/UTC setting next to the time slider above: Local jumps an hour at DST transitions (matching your clock); UTC steps by a constant 24h with no jump.";
   }
   updateModeVisibility(playback.mode);
 
@@ -185,12 +256,23 @@ export function mountControlPanel(container: HTMLElement, store: Store, playback
     const [h, m] = fixedTimeInput.value.split(":").map(Number);
     playback.setFixedTimeMinutes(h * 60 + m);
   });
-  timeRefSelect.addEventListener("change", () => {
-    playback.setTimeReference(timeRefSelect.value as TimeReference);
-  });
   playback.onPlayStateChange((playing) => {
     playBtn.textContent = playing ? "⏸ Pause" : "▶ Play";
   });
+
+  const trackBtn = container.querySelector("#f-track") as HTMLButtonElement;
+  const trackClearBtn = container.querySelector("#f-track-clear") as HTMLButtonElement;
+
+  trackBtn.addEventListener("click", () => {
+    if (scene.isTracking) {
+      scene.stopTracking();
+    } else {
+      scene.startTracking(store.get());
+    }
+    trackBtn.textContent = scene.isTracking ? "Stop tracking" : "Start tracking";
+    trackBtn.classList.toggle("active", scene.isTracking);
+  });
+  trackClearBtn.addEventListener("click", () => scene.clearTrack());
 
   const readout = container.querySelector("#readout") as HTMLElement;
   const todayReadout = container.querySelector("#today-readout") as HTMLElement;

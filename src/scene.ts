@@ -24,6 +24,8 @@ const EYE_VIEW_DISTANCE = 0.01;
 const SUN_DAY_COLOR = 0xffdd55;
 const SUN_NIGHT_COLOR = 0x3a3f55; // dim, not hidden — the sun is still "there", just set
 
+const TRACK_COLOR = 0x35e0c2;
+
 /** Compass azimuth (deg, 0=N clockwise) -> horizontal unit vector, north=-Z, east=+X. */
 function azToHorizontal(azDeg: number): THREE.Vector2 {
   const rad = (azDeg * Math.PI) / 180;
@@ -99,6 +101,11 @@ export class SunnyScene {
   private inEyeView = false;
   private lastEyeViewKey = "";
 
+  private trackLine: THREE.Line;
+  private trackPoints: THREE.Vector3[] = [];
+  private tracking = false;
+  private lastTrackedDateMs: number | null = null;
+
   constructor(container: HTMLElement) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setPixelRatio(window.devicePixelRatio);
@@ -160,6 +167,12 @@ export class SunnyScene {
     this.scene.add(this.rayLine);
 
     this.scene.add(this.dayArcGroup);
+
+    this.trackLine = new THREE.Line(
+      new THREE.BufferGeometry(),
+      new THREE.LineBasicMaterial({ color: TRACK_COLOR, transparent: true, opacity: 0.85 }),
+    );
+    this.scene.add(this.trackLine);
 
     this.resize(container);
     new ResizeObserver(() => this.resize(container)).observe(container);
@@ -241,6 +254,57 @@ export class SunnyScene {
     (this.rayLine.material as THREE.LineBasicMaterial).color.set(
       glare ? 0xff3333 : 0x888888,
     );
+
+    this.recordTrackPoint(date.getTime(), sunPos);
+  }
+
+  get isTracking(): boolean {
+    return this.tracking;
+  }
+
+  /** Starts (or resumes) recording the sun's position into the track on every date change — manual or automated. */
+  startTracking(state: AppState) {
+    this.tracking = true;
+    const { azimuthDeg, elevationDeg } = getSunPosition(
+      state.date,
+      state.config.latitude,
+      state.config.longitude,
+    );
+    const eyePos = new THREE.Vector3(0, state.config.eyeHeight, 0);
+    const sunPos = sunWorldPosition(azimuthDeg, elevationDeg, SUN_DISTANCE, eyePos);
+    this.recordTrackPoint(state.date.getTime(), sunPos);
+  }
+
+  /** Pauses recording; the existing track stays visible. */
+  stopTracking() {
+    this.tracking = false;
+  }
+
+  /** Erases the recorded track. */
+  clearTrack() {
+    this.trackPoints = [];
+    this.lastTrackedDateMs = null;
+    this.rebuildTrackGeometry();
+  }
+
+  /**
+   * Appends a point to the track if we're tracking and this is actually a
+   * new moment — guards against adding duplicate points when update() runs
+   * without the date having changed (e.g. a config-only tweak).
+   */
+  private recordTrackPoint(dateMs: number, sunPos: THREE.Vector3) {
+    if (!this.tracking || dateMs === this.lastTrackedDateMs) return;
+    this.lastTrackedDateMs = dateMs;
+    this.trackPoints.push(sunPos.clone());
+    this.rebuildTrackGeometry();
+  }
+
+  private rebuildTrackGeometry() {
+    this.trackLine.geometry.dispose();
+    this.trackLine.geometry =
+      this.trackPoints.length >= 2
+        ? new THREE.BufferGeometry().setFromPoints(this.trackPoints)
+        : new THREE.BufferGeometry();
   }
 
   get isInEyeView(): boolean {

@@ -54,7 +54,7 @@ povBtn.addEventListener("click", () => {
 });
 
 const panel = document.querySelector<HTMLElement>("#panel")!;
-mountControlPanel(panel, store, playback);
+mountControlPanel(panel, store, playback, scene);
 
 const yearSection = document.querySelector<HTMLElement>("#year-section")!;
 mountYearView(yearSection, store);

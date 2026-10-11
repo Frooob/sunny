@@ -21,8 +21,15 @@ All inputs live in the side panel and update the simulation live:
 - **Window & desk geometry**: window azimuth (degrees), window sill/top
   height, window width (centered on the eye point), eye height, distance
   from eye to window (all relative to the room's own floor)
-- **Date & time**: scrub through a day; the 3D view and current-state
-  readout update accordingly
+- **Date & time**: a date picker, a day-of-year slider, and a time-of-day
+  slider — any of them update the 3D view and current-state readout live.
+  The time slider has a **Local / UTC** toggle: this is the one setting
+  that governs both how the slider reads/writes and how the day-stepping
+  playback modes below advance — local jumps an hour at DST transitions
+  (matching your clock); UTC steps by a constant 24h with no jump.
+- **View from desk**: button (top-right of the 3D view) that puts the
+  camera at the eye's position looking out the window — rotate to look
+  around, no zoom/pan (a head turns but doesn't move)
 - **Watch the year play out**: animate the date/time forward, in one of
   three modes:
   - *Full day sweep* — plays through real time, night included (the sun
@@ -31,10 +38,11 @@ All inputs live in the side panel and update the simulation live:
     you watch that moment's sun position shift across the year
   - *Daily glare onset* — jumps day by day to the moment glare first
     starts that day
-  
-  The latter two offer a **Local / UTC** time reference: local time steps
-  by calendar day in your timezone (and jumps an hour at DST transitions,
-  matching your actual clock); UTC steps by real 24h days with no jump.
+- **Track the sun**: records every sun position visited — by playback or
+  by manually dragging a date/day/time slider — into a persistent trail in
+  the 3D view, until cleared. In the day-stepping modes this naturally
+  records one point per day rather than a dense sweep, since that's all
+  that mode visits.
 
 Defaults are pre-filled from the real geometry this was built for (see
 `src/config.ts`).
