@@ -27,6 +27,21 @@ body {
   height: 72vh;
   min-height: 420px;
   width: 100%;
+  position: relative;
+}
+
+#panel-toggle {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 40;
+  width: auto;
+  padding: 8px 14px;
+  font-size: 13px;
+  background: rgba(11, 16, 32, 0.85);
+  border: 1px solid #334165;
+  border-radius: 6px;
+  backdrop-filter: blur(2px);
 }
 
 #scene-container {
@@ -82,6 +97,48 @@ body {
   padding: 16px;
   background: #11182b;
   border-left: 1px solid #22304a;
+  transition: flex-basis 0.2s ease, padding 0.2s ease;
+}
+
+/* Desktop/wide: collapsing shrinks the slot it occupies, scene gets the space back. */
+#top-row.panel-collapsed #panel {
+  flex-basis: 0;
+  padding: 0;
+  border-left: none;
+  overflow: hidden;
+}
+
+/* Narrow/mobile: side-by-side doesn't fit, so the panel becomes a slide-over
+   drawer on top of the 3D view instead of squeezing it — and starts closed
+   (see main.ts) so the scene gets full width by default. */
+@media (max-width: 760px) {
+  #panel {
+    position: absolute;
+    top: 0;
+    right: 0;
+    height: 100%;
+    width: min(340px, 85vw);
+    flex-basis: auto;
+    padding: 16px;
+    transform: translateX(0);
+    box-shadow: -12px 0 28px rgba(0, 0, 0, 0.45);
+    z-index: 30;
+    transition: transform 0.2s ease;
+  }
+
+  #top-row.panel-collapsed #panel {
+    transform: translateX(100%);
+    padding: 16px;
+    border-left: 1px solid #22304a;
+  }
+}
+
+/* #panel-toggle is viewport-fixed and #pov-toggle is scene-relative — they
+   only collide once the scene spans edge to edge, which happens whenever
+   the panel is collapsed (not just below the mobile breakpoint: collapsing
+   it on a wide screen does the same thing). Stack them instead. */
+#top-row.panel-collapsed #pov-toggle {
+  top: 60px;
 }
 
 #panel h1 {

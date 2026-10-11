@@ -58,3 +58,21 @@ mountControlPanel(panel, store, playback, scene);
 
 const yearSection = document.querySelector<HTMLElement>("#year-section")!;
 mountYearView(yearSection, store);
+
+// Collapsible sidebar: starts closed on narrow (mobile) viewports, where
+// the fixed-width panel would otherwise eat the whole screen, and open on
+// wider ones, matching the previous always-visible behavior.
+const topRow = document.querySelector<HTMLElement>("#top-row")!;
+const panelToggle = document.querySelector<HTMLButtonElement>("#panel-toggle")!;
+
+function setPanelCollapsed(collapsed: boolean) {
+  topRow.classList.toggle("panel-collapsed", collapsed);
+  panelToggle.textContent = collapsed ? "Settings" : "Close";
+  panelToggle.classList.toggle("active", !collapsed);
+}
+
+setPanelCollapsed(window.matchMedia("(max-width: 760px)").matches);
+
+panelToggle.addEventListener("click", () => {
+  setPanelCollapsed(!topRow.classList.contains("panel-collapsed"));
+});

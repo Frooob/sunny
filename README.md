@@ -15,7 +15,10 @@ Then open the printed local URL (e.g. http://localhost:5173).
 
 ## Usage
 
-All inputs live in the side panel and update the simulation live:
+All inputs live in the side panel (toggle it with the "Settings" button,
+top-right — collapsed by default on narrow/mobile screens, where it
+overlays the 3D view instead of squeezing it) and update the simulation
+live:
 
 - **Location**: latitude/longitude
 - **Window & desk geometry**: window azimuth (degrees), window sill/top
