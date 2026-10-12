@@ -23,6 +23,16 @@ function numberField(
   `;
 }
 
+function checkboxField(label: string, key: keyof SunnyConfig, store: Store): string {
+  const checked = store.get().config[key] ? "checked" : "";
+  return `
+    <div class="field">
+      <label for="f-${key}">${label}</label>
+      <input id="f-${key}" type="checkbox" ${checked} data-bool-key="${key}" />
+    </div>
+  `;
+}
+
 function fmtHM(d: Date): string {
   return d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
 }
@@ -58,6 +68,16 @@ export function mountControlPanel(
       <h2>Location</h2>
       ${numberField("Latitude", "latitude", 0.0001, store)}
       ${numberField("Longitude", "longitude", 0.0001, store)}
+    </section>
+
+    <section>
+      <h2>Earth's orbit</h2>
+      <p class="subtitle" style="margin-bottom: 10px;">
+        The two independent causes of seasons and the sun's day-to-day
+        drift — disable either to see how the sky would look without it.
+      </p>
+      ${checkboxField("Axial tilt (seasons)", "tiltEnabled", store)}
+      ${checkboxField("Orbital eccentricity (elliptical orbit)", "eccentricityEnabled", store)}
     </section>
 
     <section>
@@ -152,6 +172,14 @@ export function mountControlPanel(
       if (!Number.isNaN(value)) {
         store.updateConfig({ [key]: value } as Partial<SunnyConfig>);
       }
+    });
+  });
+
+  // Wire config boolean (checkbox) inputs.
+  container.querySelectorAll<HTMLInputElement>("input[data-bool-key]").forEach((input) => {
+    input.addEventListener("change", () => {
+      const key = input.dataset.boolKey as keyof SunnyConfig;
+      store.updateConfig({ [key]: input.checked } as Partial<SunnyConfig>);
     });
   });
 
@@ -302,11 +330,7 @@ export function mountControlPanel(
   store.subscribe((state) => {
     setDateTimeInputsFrom(state.date);
 
-    const { azimuthDeg, elevationDeg } = getSunPosition(
-      state.date,
-      state.config.latitude,
-      state.config.longitude,
-    );
+    const { azimuthDeg, elevationDeg } = getSunPosition(state.date, state.config);
     const glare = isGlare(azimuthDeg, elevationDeg, state.config);
     const deltaAz = ((((azimuthDeg - state.config.windowAzimuthDeg) % 360) + 540) % 360) - 180;
     const bounds = glareElevationBounds(deltaAz, state.config);

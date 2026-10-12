@@ -223,11 +223,7 @@ export class SunnyScene {
 
     // Sun position for the selected date/time, anchored at the eye so it
     // sits exactly along the (azimuth, elevation) line of sight from there.
-    const { azimuthDeg, elevationDeg } = getSunPosition(
-      date,
-      config.latitude,
-      config.longitude,
-    );
+    const { azimuthDeg, elevationDeg } = getSunPosition(date, config);
     const sunPos = sunWorldPosition(azimuthDeg, elevationDeg, SUN_DISTANCE, eyePos);
     this.sunMesh.position.copy(sunPos);
     (this.sunMesh.material as THREE.MeshBasicMaterial).color.set(
@@ -269,11 +265,7 @@ export class SunnyScene {
   /** Starts (or resumes) recording the sun's position into the track on every date change — manual or automated. */
   startTracking(state: AppState) {
     this.tracking = true;
-    const { azimuthDeg, elevationDeg } = getSunPosition(
-      state.date,
-      state.config.latitude,
-      state.config.longitude,
-    );
+    const { azimuthDeg, elevationDeg } = getSunPosition(state.date, state.config);
     const eyePos = new THREE.Vector3(0, state.config.eyeHeight, 0);
     const sunPos = sunWorldPosition(azimuthDeg, elevationDeg, SUN_DISTANCE, eyePos);
     this.recordTrackPoint(state.date.getTime(), sunPos);

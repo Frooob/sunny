@@ -26,6 +26,15 @@ live:
   so a low winter sun at high latitude still reaches full brightness at
   its own local noon, same as a high midday sun near the equator
 - **Location**: latitude/longitude
+- **Earth's orbit**: independently toggle axial tilt (seasons) and orbital
+  eccentricity (the ellipse) off, to see how the sky would look with
+  either real-world effect removed — e.g. no tilt flattens the sun's
+  elevation to a near-constant value year-round (no seasons at all).
+  Disabling either switches the astronomy engine from suncalc (used when
+  both are on, for full real-world accuracy) to a from-scratch formula
+  with tilt/eccentricity as explicit parameters (see `src/astronomy.ts`)
+  — the two agree to within ~0.01° when both toggles are on, so nothing
+  changes unless you actually touch these.
 - **Window & desk geometry**: window azimuth (degrees), window sill/top
   height, window width (centered on the eye point), eye height, distance
   from eye to window (all relative to the room's own floor)

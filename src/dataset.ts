@@ -31,11 +31,7 @@ export function findGlareIntervals(
   const minutesInDay = (24 * 60) / stepMinutes;
   for (let i = 0; i <= minutesInDay; i++) {
     const t = new Date(dayStart.getTime() + i * stepMinutes * 60_000);
-    const { azimuthDeg, elevationDeg } = getSunPosition(
-      t,
-      config.latitude,
-      config.longitude,
-    );
+    const { azimuthDeg, elevationDeg } = getSunPosition(t, config);
     const glare = isGlare(azimuthDeg, elevationDeg, config);
 
     if (glare && currentStart === null) {

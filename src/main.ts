@@ -51,11 +51,7 @@ store.subscribe((state) => {
 
 const overlay = document.querySelector<HTMLDivElement>("#scene-overlay")!;
 store.subscribe((state) => {
-  const { azimuthDeg, elevationDeg } = getSunPosition(
-    state.date,
-    state.config.latitude,
-    state.config.longitude,
-  );
+  const { azimuthDeg, elevationDeg } = getSunPosition(state.date, state.config);
   const glare = isGlare(azimuthDeg, elevationDeg, state.config);
   const dateStr = state.date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
   const timeStr = state.date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });

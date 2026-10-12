@@ -1,5 +1,5 @@
 import type { SunnyConfig } from "./config.ts";
-import { getSunPosition, getSunTimes } from "./solar.ts";
+import { getSunPosition } from "./solar.ts";
 
 export type ThemeMode = "dark" | "light" | "dynamic";
 
@@ -253,20 +253,29 @@ export class DynamicBrightness {
   private peakElevationDeg = 0;
 
   fractionFor(date: Date, config: SunnyConfig): number {
-    const key = `${date.toDateString()}|${config.latitude}|${config.longitude}`;
+    // Keyed on the tilt/eccentricity toggles too — disabling either changes
+    // the whole year's elevation pattern, not just a given day's.
+    const key = `${date.toDateString()}|${config.latitude}|${config.longitude}|${config.tiltEnabled}|${config.eccentricityEnabled}`;
     if (key !== this.cacheKey) {
       this.cacheKey = key;
-      const solarNoon = getSunTimes(date, config.latitude, config.longitude).solarNoon;
-      this.peakElevationDeg = getSunPosition(
-        solarNoon,
-        config.latitude,
-        config.longitude,
-      ).elevationDeg;
+      // suncalc's getTimes() (the previous source of solar noon) has real
+      // Earth physics hardcoded, so it can't respect these toggles — scan
+      // the day instead, using the same toggle-aware getSunPosition
+      // everything else in the app uses.
+      const dayStart = new Date(date);
+      dayStart.setHours(0, 0, 0, 0);
+      let peak = -90;
+      for (let i = 0; i <= 24 * 4; i++) {
+        const t = new Date(dayStart.getTime() + i * 15 * 60_000);
+        const el = getSunPosition(t, config).elevationDeg;
+        if (el > peak) peak = el;
+      }
+      this.peakElevationDeg = peak;
     }
 
     if (this.peakElevationDeg <= 0) return 0; // polar night: sun never really rises
 
-    const { elevationDeg } = getSunPosition(date, config.latitude, config.longitude);
+    const { elevationDeg } = getSunPosition(date, config);
     if (elevationDeg <= 0) return 0;
 
     return Math.max(0, Math.min(1, elevationDeg / this.peakElevationDeg));

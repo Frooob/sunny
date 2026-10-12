@@ -22,6 +22,11 @@ export interface SunnyConfig {
   eyeHeight: number;
   /** Horizontal distance from the eye point straight back to the window wall, meters. */
   distanceToWindow: number;
+
+  /** Whether Earth's axial tilt is in effect. False = no seasons (sun stays on the celestial equator). */
+  tiltEnabled: boolean;
+  /** Whether Earth's orbital eccentricity is in effect. False = a perfectly circular orbit. */
+  eccentricityEnabled: boolean;
 }
 
 /** The two points marking the window's wall line, used only to derive its azimuth below. */
@@ -37,6 +42,8 @@ export const defaultConfig: SunnyConfig = {
   windowWidth: 3,
   eyeHeight: 1.2,
   distanceToWindow: 2,
+  tiltEnabled: true,
+  eccentricityEnabled: true,
 };
 
 /** Derives the window azimuth (degrees from north) from two lat/lon points marking its wall line. */

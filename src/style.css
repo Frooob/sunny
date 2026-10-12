@@ -233,6 +233,13 @@ body {
   flex: 1 1 auto;
 }
 
+.field input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--button-bg);
+  cursor: pointer;
+}
+
 .readout {
   background: var(--readout-bg);
   border: 1px solid var(--readout-border);

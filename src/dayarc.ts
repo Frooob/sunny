@@ -22,11 +22,7 @@ export function computeDayArc(
   const steps = (24 * 60) / stepMinutes;
   for (let i = 0; i <= steps; i++) {
     const t = new Date(dayStart.getTime() + i * stepMinutes * 60_000);
-    const { azimuthDeg, elevationDeg } = getSunPosition(
-      t,
-      config.latitude,
-      config.longitude,
-    );
+    const { azimuthDeg, elevationDeg } = getSunPosition(t, config);
     if (elevationDeg < -1) continue; // keep the arc to the visible sky
     points.push({
       time: t,
