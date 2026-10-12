@@ -5,6 +5,7 @@ import type { SunnyConfig } from "./config.ts";
 import { getSunPosition } from "./solar.ts";
 import { isGlare } from "./geometry.ts";
 import type { DayArcPoint } from "./dayarc.ts";
+import { scenePaletteAt, type ScenePalette } from "./theme.ts";
 
 const SUN_DISTANCE = 16;
 const PLATFORM_SIZE = 14; // matches the floor/grid extent — the wall runs edge to edge of it
@@ -106,6 +107,10 @@ export class SunnyScene {
   private tracking = false;
   private lastTrackedDateMs: number | null = null;
 
+  private ambientLight: THREE.AmbientLight;
+  private floorMaterial: THREE.MeshStandardMaterial;
+  private gridHelper: THREE.GridHelper;
+
   constructor(container: HTMLElement) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setPixelRatio(window.devicePixelRatio);
@@ -122,20 +127,19 @@ export class SunnyScene {
     this.controls.minDistance = OVERVIEW_MIN_DISTANCE;
     this.controls.maxDistance = OVERVIEW_MAX_DISTANCE;
 
-    this.scene.add(new THREE.AmbientLight(0x667799, 0.6));
+    this.ambientLight = new THREE.AmbientLight(0x667799, 0.6);
+    this.scene.add(this.ambientLight);
 
     this.sunLight = new THREE.DirectionalLight(0xfff2cc, 1.2);
     this.scene.add(this.sunLight);
 
-    const floor = new THREE.Mesh(
-      new THREE.PlaneGeometry(14, 14),
-      new THREE.MeshStandardMaterial({ color: 0x2a2f3a }),
-    );
+    this.floorMaterial = new THREE.MeshStandardMaterial({ color: 0x2a2f3a });
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(14, 14), this.floorMaterial);
     floor.rotation.x = -Math.PI / 2;
     this.scene.add(floor);
 
-    const grid = new THREE.GridHelper(14, 14, 0x445566, 0x334455);
-    this.scene.add(grid);
+    this.gridHelper = new THREE.GridHelper(14, 14, 0x445566, 0x334455);
+    this.scene.add(this.gridHelper);
 
     this.scene.add(this.windowGroup);
     this.wallMaterial = new THREE.MeshStandardMaterial({
@@ -305,6 +309,26 @@ export class SunnyScene {
       this.trackPoints.length >= 2
         ? new THREE.BufferGeometry().setFromPoints(this.trackPoints)
         : new THREE.BufferGeometry();
+  }
+
+  /** Sets how bright the scene looks, 0 (dark mode) to 1 (light mode) — anything between is a blend, used continuously by dynamic mode. */
+  setBrightness(t: number) {
+    const p: ScenePalette = scenePaletteAt(t);
+    this.scene.background = new THREE.Color(p.background);
+    this.floorMaterial.color.setHex(p.floor);
+    this.wallMaterial.color.setHex(p.wall);
+    this.ambientLight.color.setHex(p.ambientColor);
+    this.ambientLight.intensity = p.ambientIntensity;
+
+    // GridHelper bakes its two colors into per-vertex geometry attributes
+    // at construction time — there's no material.color to just update, so
+    // swap the whole helper out instead.
+    const oldGrid = this.gridHelper;
+    this.gridHelper = new THREE.GridHelper(14, 14, p.gridMain, p.gridSub);
+    this.scene.add(this.gridHelper);
+    this.scene.remove(oldGrid);
+    oldGrid.geometry.dispose();
+    (oldGrid.material as THREE.Material).dispose();
   }
 
   get isInEyeView(): boolean {

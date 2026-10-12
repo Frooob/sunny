@@ -6,6 +6,7 @@ import { findGlareIntervals } from "./dataset.ts";
 import type { Playback, PlaybackMode } from "./playback.ts";
 import { dayOfYear, isLeapYear, withDayOfYear, type TimeReference } from "./timeref.ts";
 import type { SunnyScene } from "./scene.ts";
+import type { ThemeController, ThemeMode } from "./theme.ts";
 
 function numberField(
   label: string,
@@ -35,10 +36,23 @@ export function mountControlPanel(
   store: Store,
   playback: Playback,
   scene: SunnyScene,
+  theme: ThemeController,
 ) {
   container.innerHTML = `
     <h1>Sunny</h1>
     <p class="subtitle">Window-glare simulator</p>
+
+    <section>
+      <h2>Appearance</h2>
+      <div class="field">
+        <label for="f-theme">Theme</label>
+        <select id="f-theme">
+          <option value="dark">Dark</option>
+          <option value="light">Light</option>
+          <option value="dynamic">Dynamic (follows the sun)</option>
+        </select>
+      </div>
+    </section>
 
     <section>
       <h2>Location</h2>
@@ -139,6 +153,12 @@ export function mountControlPanel(
         store.updateConfig({ [key]: value } as Partial<SunnyConfig>);
       }
     });
+  });
+
+  const themeSelect = container.querySelector("#f-theme") as HTMLSelectElement;
+  themeSelect.value = theme.mode;
+  themeSelect.addEventListener("change", () => {
+    theme.setMode(themeSelect.value as ThemeMode);
   });
 
   const dateInput = container.querySelector("#f-date") as HTMLInputElement;

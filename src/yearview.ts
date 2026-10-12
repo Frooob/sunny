@@ -81,7 +81,7 @@ export function mountYearView(container: HTMLElement, store: Store) {
       text.setAttribute("x", String(width / 2));
       text.setAttribute("y", String(height / 2));
       text.setAttribute("text-anchor", "middle");
-      text.setAttribute("fill", "var(--text-secondary)");
+      text.setAttribute("fill", "var(--chart-text-secondary)");
       text.textContent = "No glare this year with the current geometry.";
       svg.appendChild(text);
       return;
@@ -115,7 +115,7 @@ export function mountYearView(container: HTMLElement, store: Store) {
       line.setAttribute("x2", String(width - MARGIN.right));
       line.setAttribute("y1", String(y));
       line.setAttribute("y2", String(y));
-      line.setAttribute("stroke", "var(--gridline)");
+      line.setAttribute("stroke", "var(--chart-gridline)");
       line.setAttribute("stroke-width", "1");
       g.appendChild(line);
 
@@ -124,7 +124,7 @@ export function mountYearView(container: HTMLElement, store: Store) {
       label.setAttribute("y", String(y + 3));
       label.setAttribute("text-anchor", "end");
       label.setAttribute("font-size", "11");
-      label.setAttribute("fill", "var(--text-muted)");
+      label.setAttribute("fill", "var(--chart-text-muted)");
       label.textContent = `${String(m / 60).padStart(2, "0")}:00`;
       g.appendChild(label);
     }
@@ -141,7 +141,7 @@ export function mountYearView(container: HTMLElement, store: Store) {
         label.setAttribute("y", String(height - MARGIN.bottom + 16));
         label.setAttribute("text-anchor", "start");
         label.setAttribute("font-size", "11");
-        label.setAttribute("fill", "var(--text-muted)");
+        label.setAttribute("fill", "var(--chart-text-muted)");
         label.textContent = MONTH_NAMES[month];
         g.appendChild(label);
       }
@@ -152,7 +152,7 @@ export function mountYearView(container: HTMLElement, store: Store) {
     baseline.setAttribute("x2", String(width - MARGIN.right));
     baseline.setAttribute("y1", String(height - MARGIN.bottom));
     baseline.setAttribute("y2", String(height - MARGIN.bottom));
-    baseline.setAttribute("stroke", "var(--baseline)");
+    baseline.setAttribute("stroke", "var(--chart-baseline)");
     baseline.setAttribute("stroke-width", "1");
     g.appendChild(baseline);
 
@@ -173,7 +173,7 @@ export function mountYearView(container: HTMLElement, store: Store) {
 
     const area = document.createElementNS(ns, "polygon");
     area.setAttribute("points", [...botPts, ...topPtsRev].join(" "));
-    area.setAttribute("fill", "var(--series-1)");
+    area.setAttribute("fill", "var(--chart-series-1)");
     area.setAttribute("fill-opacity", "0.18");
     g.appendChild(area);
 
@@ -181,7 +181,7 @@ export function mountYearView(container: HTMLElement, store: Store) {
       const line = document.createElementNS(ns, "polyline");
       line.setAttribute("points", pts.join(" "));
       line.setAttribute("fill", "none");
-      line.setAttribute("stroke", "var(--series-1)");
+      line.setAttribute("stroke", "var(--chart-series-1)");
       line.setAttribute("stroke-width", "2");
       line.setAttribute("stroke-linecap", "round");
       line.setAttribute("stroke-linejoin", "round");
@@ -192,7 +192,7 @@ export function mountYearView(container: HTMLElement, store: Store) {
     const crosshair = document.createElementNS(ns, "line");
     crosshair.setAttribute("y1", String(MARGIN.top));
     crosshair.setAttribute("y2", String(height - MARGIN.bottom));
-    crosshair.setAttribute("stroke", "var(--text-muted)");
+    crosshair.setAttribute("stroke", "var(--chart-text-muted)");
     crosshair.setAttribute("stroke-width", "1");
     crosshair.setAttribute("visibility", "hidden");
     g.appendChild(crosshair);

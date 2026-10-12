@@ -20,6 +20,11 @@ top-right — collapsed by default on narrow/mobile screens, where it
 overlays the 3D view instead of squeezing it) and update the simulation
 live:
 
+- **Theme**: Dark (default), Light, or Dynamic — Dynamic brightens and
+  dims continuously with how high the sun currently is, normalized to
+  *that day's own* peak (solar noon) rather than an absolute elevation,
+  so a low winter sun at high latitude still reaches full brightness at
+  its own local noon, same as a high midday sun near the equator
 - **Location**: latitude/longitude
 - **Window & desk geometry**: window azimuth (degrees), window sill/top
   height, window width (centered on the eye point), eye height, distance
